@@ -37,6 +37,11 @@ func _ready() -> void:
 
 # ---------- lifecycle ----------
 
+## Moves the 540x960 design area; the pause overlay keeps covering the whole viewport.
+func set_offset(o: Vector2) -> void:
+	position = o
+	overlay.place(o)
+
 func start() -> void:
 	game = Game.new()
 	game.lines_cleared.connect(func(_n): flash = 1.0)
@@ -70,6 +75,9 @@ func _notification(what: int) -> void:
 func _process(delta: float) -> void:
 	flash = maxf(0.0, flash - delta * 4.0)
 	score_changed.emit(game.score)
+	if game.over and not overlay.visible:
+		held.clear()
+		overlay.show_overlay(true, game.score, true)
 	if not game.over and not paused:
 		timer += delta
 		if timer >= game.gravity_interval():
@@ -101,17 +109,18 @@ func _button_at(pos: Vector2) -> String:
 
 # ---------- input ----------
 
-func _input(event: InputEvent) -> void:
-	if paused:
+func _input(ev: InputEvent) -> void:
+	# Touch positions are viewport-space; shift into the design area's space.
+	var event: InputEvent = ev.duplicate()
+	if event is InputEventScreenTouch or event is InputEventScreenDrag:
+		event.position -= position
+	if paused or game.over:
 		_input_paused(event)
 		return
 	if event is InputEventScreenTouch:
 		if event.pressed:
-			if PAUSE_BTN.grow(6).has_point(event.position) and not game.over:
+			if PAUSE_BTN.grow(6).has_point(event.position):
 				_set_paused(true)
-				return
-			if game.over:
-				start()
 				return
 			var b := _button_at(event.position)
 			if b != "":
@@ -123,11 +132,8 @@ func _input(event: InputEvent) -> void:
 		if held.has(event.index) and _button_at(event.position) != held[event.index].name:
 			held.erase(event.index)
 	elif event is InputEventKey and event.pressed:
-		if event.keycode in [KEY_ESCAPE, KEY_P] and not game.over:
+		if event.keycode in [KEY_ESCAPE, KEY_P]:
 			_set_paused(true)
-			return
-		if game.over:
-			start()
 			return
 		match event.keycode:
 			KEY_LEFT: game.move(-1)
@@ -136,15 +142,26 @@ func _input(event: InputEvent) -> void:
 			KEY_UP: game.rotate()
 			KEY_SPACE: game.hard_drop()
 
+## Handles input while the pause or game-over card is showing.
 func _input_paused(event: InputEvent) -> void:
 	if event is InputEventScreenTouch and event.pressed:
-		if PauseOverlay.RESUME_BTN.grow(6).has_point(event.position) or PAUSE_BTN.grow(6).has_point(event.position):
-			_set_paused(false)
+		if PauseOverlay.RESUME_BTN.grow(6).has_point(event.position) \
+				or (not game.over and PAUSE_BTN.grow(6).has_point(event.position)):
+			_resume_or_restart()
 		elif PauseOverlay.QUIT_BTN.grow(6).has_point(event.position):
 			menu_requested.emit()
 	elif event is InputEventKey and event.pressed:
-		if event.keycode in [KEY_ESCAPE, KEY_P, KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]:
-			_set_paused(false)
+		if event.keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE] \
+				or (not game.over and event.keycode in [KEY_ESCAPE, KEY_P]):
+			_resume_or_restart()
+		elif game.over and event.keycode == KEY_ESCAPE:
+			menu_requested.emit()
+
+func _resume_or_restart() -> void:
+	if game.over:
+		start()
+	else:
+		_set_paused(false)
 
 # ---------- drawing ----------
 
@@ -156,8 +173,6 @@ func _draw() -> void:
 	_draw_board()
 	_draw_side_panels()
 	_draw_buttons()
-	if game.over:
-		_draw_game_over()
 
 func _draw_header() -> void:
 	var w1 := UI.title_font.get_string_size("BLOCK", HORIZONTAL_ALIGNMENT_LEFT, -1, 38).x
@@ -171,15 +186,6 @@ func _draw_header() -> void:
 	else:
 		draw_style_box(UI.box(Color.WHITE, 2), Rect2(pc + Vector2(-9, -11), Vector2(6, 22)))
 		draw_style_box(UI.box(Color.WHITE, 2), Rect2(pc + Vector2(3, -11), Vector2(6, 22)))
-
-func _draw_game_over() -> void:
-	draw_rect(Rect2(BOARD_ORIGIN, BOARD_SIZE), Color(0, 0, 0, 0.55))
-	var card := Rect2(BOARD_ORIGIN + Vector2(30, 250), Vector2(300, 170))
-	var mid := HORIZONTAL_ALIGNMENT_CENTER
-	draw_style_box(UI.box(Color(0.1, 0.08, 0.25, 0.95), 20, 2, UI.ACCENT2), card)
-	UI.text(self, "GAME OVER", card.position + Vector2(0, 62), 32, Color.WHITE, card.size.x, mid, UI.title_font)
-	UI.text(self, "Score  %d" % game.score, card.position + Vector2(0, 100), 20, UI.ACCENT, card.size.x, mid)
-	UI.text(self, "tap to play again", card.position + Vector2(0, 140), 13, UI.TEXT_DIM, card.size.x, mid)
 
 func _draw_board() -> void:
 	var board := Rect2(BOARD_ORIGIN, BOARD_SIZE)
