@@ -1,0 +1,199 @@
+---
+import PhoneDemo from './PhoneDemo.astro';
+import Piece from './Piece.astro';
+
+const FONT: Record<string, string[]> = {
+  B: ['1110', '1001', '1110', '1001', '1110'],
+  L: ['1000', '1000', '1000', '1000', '1111'],
+  O: ['0110', '1001', '1001', '1001', '0110'],
+  C: ['0111', '1000', '1000', '1000', '0111'],
+  K: ['1001', '1010', '1100', '1010', '1001'],
+  I: ['111', '010', '010', '010', '111'],
+  N: ['1001', '1101', '1011', '1001', '1001'],
+};
+const WORD = 'BLOCKLIN'.split('');
+const PAL = ['--pT', '--pO', '--pI', '--pS', '--pZ', '--pJ', '--pL', '--pT'];
+// a seeded scatter so the SSR markup is stable
+const rnd = (n: number) => { const x = Math.sin(n * 91.7) * 10000; return x - Math.floor(x); };
+const letters = WORD.map((ch, li) => ({
+  ch, color: PAL[li],
+  cols: FONT[ch][0].length,
+  cells: FONT[ch].flatMap((row, y) => [...row].map((v, x) => (v === '1' ? { x, y, d: li * 0.16 + (4 - y) * 0.07 + rnd(li * 31 + x * 7 + y) * 0.1, r: Math.round((rnd(li + x * 3 + y * 5) - 0.5) * 540) } : null)).filter(Boolean)),
+}));
+---
+<section class="hero" id="top">
+  <div class="sky" aria-hidden="true">
+    <div class="sun"></div>
+    <div class="floor"></div>
+    <div class="horizon"></div>
+  </div>
+
+  <header class="wrap nav">
+    <a href="#top" class="brand"><img src="/favicon.svg" alt="" width="34" height="34" />Blocklin</a>
+    <nav>
+      <a href="#pieces">Pieces</a><a href="#feel">Feel</a><a href="#clear">Clear</a>
+      <a href="#get" class="pill">Get it</a>
+    </nav>
+  </header>
+
+  <div class="wrap stage">
+    <h1 class="title" id="title" aria-label="Blocklin">
+      {letters.map((l) => (
+        <span class="letter" aria-hidden="true" style={`--cols:${l.cols};--lc:var(${l.color})`}>
+          {l.cells.map((c: any) => (
+            <span class="cell" style={`grid-column:${c.x + 1};grid-row:${c.y + 1}`}>
+              <i class="blk" style={`--d:${c.d.toFixed(2)}s;--r:${c.r}deg`}></i>
+            </span>
+          ))}
+        </span>
+      ))}
+    </h1>
+
+    <div class="below">
+      <div class="copy">
+        <p class="eyebrow reveal">Neon block-stacking for your thumbs</p>
+        <p class="tag reveal" style="--d:.1s">Stack. <em>Clear.</em> Chain.</p>
+        <p class="lede reveal" style="--d:.2s">A glossy, synthwave falling-block puzzler on a tight 14×28 board. Swipe to slide, tap to spin, flick to slam — and string line clears into scoring combos while the rim of the board glows hotter the higher you stack.</p>
+        <div class="cta reveal" style="--d:.3s">
+          <a class="btn" href="#get">Download <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12M6 11l6 6 6-6M5 21h14"/></svg></a>
+          <a class="btn ghost" href="https://github.com/faisalsaifii/blocklin" target="_blank" rel="noopener">Source</a>
+        </div>
+        <dl class="stats reveal" style="--d:.4s">
+          <div><dt>14×28</dt><dd>board</dd></div>
+          <div><dt>7</dt><dd>pieces</dd></div>
+          <div><dt>∞</dt><dd>combos</dd></div>
+        </dl>
+      </div>
+
+      <div class="device">
+        <div class="orbit o1"><Piece type="T" size={26} /></div>
+        <div class="orbit o2"><Piece type="L" size={22} /></div>
+        <div class="orbit o3"><Piece type="S" size={30} /></div>
+        <div class="orbit o4"><Piece type="O" size={24} /></div>
+        <div class="orbit o5"><Piece type="I" size={20} /></div>
+        <PhoneDemo />
+      </div>
+    </div>
+  </div>
+  <div class="scrollcue" aria-hidden="true"><span></span></div>
+</section>
+
+<style>
+  .hero { position: relative; z-index: 1; min-height: 100vh; padding-bottom: 120px; overflow: clip; }
+
+  /* ---- synthwave sky ---- */
+  .sky { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+  .sun {
+    position: absolute; left: 50%; bottom: 14%; width: min(720px, 90vw); aspect-ratio: 2 / 1; translate: -50% 0; border-radius: 999px 999px 0 0;
+    background: linear-gradient(180deg, #ffd54f 0%, #ff6bcb 55%, #7b3fe4 100%); opacity: .5;
+    -webkit-mask: linear-gradient(#000, #000) 0 0 / 100% 40% no-repeat, repeating-linear-gradient(180deg, #000 0 10px, transparent 10px 18px) 0 100% / 100% 60% no-repeat;
+    mask: linear-gradient(#000, #000) 0 0 / 100% 40% no-repeat, repeating-linear-gradient(180deg, #000 0 10px, transparent 10px 18px) 0 100% / 100% 60% no-repeat;
+    animation: sunpulse 8s ease-in-out infinite;
+  }
+  @keyframes sunpulse { 50% { opacity: .72; } }
+  .horizon { position: absolute; left: 0; right: 0; bottom: 14%; height: 3px; background: linear-gradient(90deg, transparent, var(--cyan), var(--pink), var(--cyan), transparent); box-shadow: 0 0 30px 6px rgba(255, 107, 203, .5); }
+  .floor {
+    position: absolute; left: -50%; right: -50%; bottom: 0; height: 14%; transform-origin: top; perspective: 400px;
+    background:
+      repeating-linear-gradient(90deg, rgba(255, 107, 203, .6) 0 2px, transparent 2px 90px),
+      repeating-linear-gradient(180deg, rgba(255, 107, 203, .6) 0 2px, transparent 2px 36px);
+    transform: perspective(300px) rotateX(58deg); transform-origin: 50% 0; animation: flow 1.6s linear infinite;
+    mask: linear-gradient(180deg, #000, transparent 100%); -webkit-mask: linear-gradient(180deg, #000, transparent 100%);
+    height: 44%; bottom: -30%;
+  }
+  @keyframes flow { to { background-position: 0 0, 0 36px; } }
+
+  /* ---- nav ---- */
+  .nav { display: flex; justify-content: space-between; align-items: center; padding-top: 26px; position: relative; z-index: 5; }
+  .brand { display: flex; align-items: center; gap: 12px; font-family: var(--display); font-size: 20px; letter-spacing: .04em; }
+  .brand img { border-radius: 9px; box-shadow: 0 0 20px rgba(186, 104, 200, .6); }
+  .nav nav { display: flex; align-items: center; gap: 28px; font-size: 12px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; }
+  .nav nav a { color: var(--dim); transition: color .2s; }
+  .nav nav a:hover { color: var(--cyan); }
+  .nav .pill { color: #fff; padding: 10px 18px; border-radius: 999px; background: rgba(255, 107, 203, .18); box-shadow: inset 0 0 0 1.5px var(--pink); }
+  .nav .pill:hover { background: var(--pink); color: #fff; }
+
+  /* ---- block title ---- */
+  .stage { position: relative; z-index: 2; padding-top: clamp(30px, 6vh, 70px); }
+  .title { --u: clamp(5px, min(2.55vw, calc((100vw - 56px) / 40)), 28px); display: flex; justify-content: center; gap: calc(var(--u) * 1.15); width: 100%; cursor: crosshair; filter: drop-shadow(0 12px 28px rgba(15, 12, 41, .6)); }
+  .letter { display: grid; grid-template-columns: repeat(var(--cols), var(--u)); grid-template-rows: repeat(5, var(--u)); }
+  .cell { display: block; width: var(--u); height: var(--u); will-change: transform; }
+  .cell .blk { --c: var(--lc); position: absolute; inset: 0; transform: scale(.93); animation: drop 1.15s calc(var(--d) + .2s) cubic-bezier(.3, 0, .2, 1) both; }
+  @keyframes drop {
+    0% { translate: 0 -120vh; rotate: var(--r); opacity: 0; }
+    6% { opacity: 1; }
+    62% { translate: 0 0; rotate: 0deg; }
+    74% { translate: 0 -22%; }
+    86% { translate: 0 0; }
+    93% { translate: 0 -6%; }
+    100% { translate: 0 0; }
+  }
+  .cell { position: relative; }
+
+  /* ---- below ---- */
+  .below { display: grid; grid-template-columns: 1.1fr .9fr; align-items: center; gap: 40px; margin-top: clamp(34px, 6vh, 60px); }
+  .tag { font-family: var(--display); font-size: clamp(30px, 5vw, 58px); line-height: 1; margin-top: 16px; }
+  .tag em { font-style: normal; color: var(--cyan); text-shadow: 0 0 24px rgba(94, 231, 255, .6); }
+  .cta { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 34px; }
+  .stats { display: flex; gap: 40px; margin-top: 40px; }
+  .stats div { display: flex; flex-direction: column; gap: 4px; }
+  .stats dt { font-family: var(--display); font-size: 28px; }
+  .stats dd { font-size: 10px; letter-spacing: .3em; text-transform: uppercase; color: var(--dim); font-weight: 700; }
+
+  .device { position: relative; display: grid; place-items: center; padding: 30px 0 70px; }
+  .orbit { position: absolute; z-index: 3; filter: drop-shadow(0 0 14px color-mix(in srgb, var(--c, #fff) 60%, transparent)); animation: float var(--t, 7s) ease-in-out infinite; }
+  @keyframes float { 0%, 100% { transform: translate(0, 0) rotate(var(--a, 0deg)); } 50% { transform: translate(var(--dx, 12px), -26px) rotate(calc(var(--a, 0deg) + 24deg)); } }
+  .o1 { top: 6%; left: 2%; --a: -12deg; --t: 7s; }
+  .o2 { top: 28%; right: -2%; --a: 20deg; --t: 8s; --dx: -16px; }
+  .o3 { bottom: 24%; left: -4%; --a: 8deg; --t: 6.2s; }
+  .o4 { bottom: 6%; right: 6%; --a: -8deg; --t: 9s; --dx: -10px; }
+  .o5 { top: -2%; right: 20%; --a: 70deg; --t: 7.5s; }
+
+  .scrollcue { position: absolute; left: 50%; bottom: 24px; translate: -50% 0; width: 22px; height: 38px; border-radius: 99px; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .35); }
+  .scrollcue span { position: absolute; left: 50%; top: 8px; width: 4px; height: 8px; margin-left: -2px; border-radius: 4px; background: var(--cyan); animation: cue 1.6s infinite; }
+  @keyframes cue { 0% { opacity: 0; translate: 0 0; } 30% { opacity: 1; } 100% { opacity: 0; translate: 0 14px; } }
+
+  @media (max-width: 880px) {
+    .below { grid-template-columns: 1fr; }
+    .nav nav a:not(.pill) { display: none; }
+    .device { padding-bottom: 80px; }
+    .scrollcue { display: none; }
+  }
+</style>
+
+<script>
+  // Title blocks scatter away from the pointer on spring physics; click blows the word apart.
+  const title = document.getElementById('title')!;
+  const cells = [...title.querySelectorAll<HTMLElement>('.cell')];
+  const st = cells.map(() => ({ x: 0, y: 0, vx: 0, vy: 0, r: 0, vr: 0, cx: 0, cy: 0 }));
+  let mx = -9999, my = -9999, running = false;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const measure = () => cells.forEach((el, i) => {
+    const b = el.getBoundingClientRect(); st[i].cx = b.left + b.width / 2 - st[i].x; st[i].cy = b.top + b.height / 2 - st[i].y;
+  });
+  const tick = () => {
+    let moving = false;
+    const R = Math.max(90, title.getBoundingClientRect().width * 0.09);
+    cells.forEach((el, i) => {
+      const s = st[i];
+      const dx = s.cx - mx, dy = s.cy - my, d = Math.hypot(dx, dy);
+      if (d < R) { const f = (1 - d / R) ** 2 * 2.6; s.vx += (dx / (d || 1)) * f; s.vy += (dy / (d || 1)) * f; s.vr += (dx / (d || 1)) * f * 0.5; }
+      s.vx += -s.x * 0.06; s.vy += -s.y * 0.06; s.vr += -s.r * 0.06;
+      s.vx *= 0.88; s.vy *= 0.88; s.vr *= 0.88;
+      s.x += s.vx; s.y += s.vy; s.r += s.vr;
+      if (Math.abs(s.x) + Math.abs(s.y) + Math.abs(s.vx) + Math.abs(s.vy) > 0.05) moving = true;
+      el.style.transform = `translate(${s.x.toFixed(2)}px, ${s.y.toFixed(2)}px) rotate(${s.r.toFixed(2)}deg)`;
+    });
+    if (moving || mx > -9000) requestAnimationFrame(tick); else running = false;
+  };
+  const kick = () => { if (!running && !reduce) { running = true; measure(); requestAnimationFrame(tick); } };
+
+  addEventListener('pointermove', (e) => { mx = e.clientX; my = e.clientY; const r = title.getBoundingClientRect(); if (my > r.top - 140 && my < r.bottom + 140) kick(); else mx = my = -9999; });
+  title.addEventListener('pointerdown', () => {
+    st.forEach((s) => { s.vx += (Math.random() - 0.5) * 70; s.vy += -Math.random() * 60 - 10; s.vr += (Math.random() - 0.5) * 40; });
+    kick();
+  });
+  addEventListener('resize', () => { if (running) measure(); });
+  addEventListener('scroll', () => { if (running) measure(); }, { passive: true });
+</script>

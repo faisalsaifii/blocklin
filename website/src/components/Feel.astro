@@ -1,0 +1,128 @@
+---
+---
+<section class="feel wrap" id="feel">
+  <p class="eyebrow reveal">The feel</p>
+  <h2 class="h2 reveal" style="--d:.05s">Built for <em>thumbs.</em><br />Tuned for <em>chains.</em></h2>
+
+  <div class="bento">
+    <!-- combo -->
+    <article class="card combo reveal">
+      <h3>Chain the clears</h3>
+      <p>Clear lines back-to-back and the combo multiplier climbs. Miss a beat and it resets, so stay greedy.</p>
+      <div class="ladder" aria-hidden="true">
+        {[1, 2, 3, 4, 5, 6].map((n) => <span style={`--n:${n}`}>x{n}</span>)}
+      </div>
+    </article>
+
+    <!-- gestures -->
+    <article class="card gest reveal" style="--d:.08s">
+      <h3>Swipe, tap, flick</h3>
+      <p>Drag to slide. Tap to rotate. Swipe down to drop. Flick to slam. Prefer buttons? They're a toggle away.</p>
+      <svg viewBox="0 0 240 150" aria-hidden="true">
+        <rect x="70" y="8" width="100" height="134" rx="12" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="2" />
+        <path id="gp" d="M96 54 H146" class="trail" />
+        <path d="M120 74 V120" class="trail t2" />
+        <circle class="finger" r="9" />
+        <circle class="tap" cx="120" cy="40" r="9" />
+      </svg>
+      <ul class="keys"><li>Drag <b>move</b></li><li>Tap <b>rotate</b></li><li>Swipe ↓ <b>drop</b></li><li>Flick <b>slam</b></li></ul>
+    </article>
+
+    <!-- danger -->
+    <article class="card danger reveal" style="--d:.16s">
+      <h3>The rim remembers</h3>
+      <p>The board's glow slides from cool cyan to alarm red as your stack climbs. You'll feel it before you see it.</p>
+      <div class="well" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+    </article>
+
+    <!-- best -->
+    <article class="card best reveal" style="--d:.24s">
+      <h3>Beat yourself</h3>
+      <p>Your best score is saved on the device, always waiting on the menu.</p>
+      <div class="score" id="best" data-to="48250">000000</div>
+      <span class="eyebrow">Best</span>
+    </article>
+
+    <!-- board -->
+    <article class="card dense reveal" style="--d:.32s">
+      <h3>Small blocks, big plans</h3>
+      <p>A 14 × 28 board of compact cells gives you room for setups, towers and last-second saves.</p>
+      <div class="mini" aria-hidden="true">
+        {Array.from({ length: 14 * 8 }).map((_, i) => <b style={`--i:${i};--h:${(i * 47) % 360}`}></b>)}
+      </div>
+    </article>
+  </div>
+</section>
+
+<style>
+  .feel { padding: 120px 0 60px; position: relative; z-index: 2; }
+  .bento { display: grid; grid-template-columns: repeat(6, 1fr); gap: 18px; margin-top: 56px; }
+  .card {
+    position: relative; overflow: hidden; padding: 30px; border-radius: 30px; background: linear-gradient(160deg, rgba(255, 255, 255, .09), rgba(255, 255, 255, .025));
+    box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, .1); backdrop-filter: blur(10px);
+  }
+  .card h3 { font-family: var(--display); font-weight: 400; font-size: 24px; letter-spacing: .02em; }
+  .card p { color: var(--dim); font-size: 13px; line-height: 1.8; margin-top: 12px; max-width: 40ch; font-weight: 500; }
+  .combo { grid-column: span 4; } .gest { grid-column: span 2; grid-row: span 2; } .danger { grid-column: span 2; } .best { grid-column: span 2; } .dense { grid-column: span 4; }
+
+  /* combo ladder */
+  .ladder { display: flex; align-items: flex-end; gap: 12px; margin-top: 28px; height: 130px; }
+  .ladder span {
+    flex: 1; height: calc(24px + var(--n) * 17px); display: grid; place-items: start center; padding-top: 10px; border-radius: 14px 14px 6px 6px;
+    font-family: var(--display); font-size: 15px; color: #fff; background: linear-gradient(180deg, var(--pink), #7b3fe4);
+    box-shadow: 0 0 30px -4px rgba(255, 107, 203, .6), inset 0 0 0 2px rgba(255, 255, 255, .3);
+    transform-origin: bottom; animation: climb 4.2s calc(var(--n) * .22s) cubic-bezier(.3, 1.6, .5, 1) infinite;
+  }
+  @keyframes climb { 0%, 8% { transform: scaleY(.15); opacity: .2; } 20%, 80% { transform: scaleY(1); opacity: 1; } 100% { transform: scaleY(.15); opacity: .2; } }
+
+  /* gestures */
+  .gest svg { width: 100%; max-width: 280px; display: block; margin: 20px auto 0; overflow: visible; }
+  .trail { fill: none; stroke: var(--cyan); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 4 7; opacity: .6; }
+  .t2 { stroke: var(--pink); }
+  .finger { fill: rgba(255, 255, 255, .92); filter: drop-shadow(0 0 8px var(--cyan)); animation: finger 6s infinite; }
+  .tap { fill: none; stroke: var(--pO); stroke-width: 2.5; transform-origin: 120px 40px; animation: tap 6s infinite; }
+  @keyframes finger {
+    0% { transform: translate(96px, 54px); opacity: 0; } 4% { opacity: 1; }
+    22% { transform: translate(146px, 54px); } 28% { transform: translate(146px, 54px); opacity: 0; }
+    38% { transform: translate(120px, 74px); opacity: 0; } 42% { opacity: 1; } 62% { transform: translate(120px, 122px); } 68% { transform: translate(120px, 122px); opacity: 0; }
+    100% { transform: translate(120px, 122px); opacity: 0; }
+  }
+  @keyframes tap { 0%, 72% { transform: scale(.3); opacity: 0; } 78% { opacity: 1; } 92% { transform: scale(2.4); opacity: 0; } 100% { opacity: 0; } }
+  .keys { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 22px; font-size: 12px; font-weight: 700; }
+  .keys li { padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, .06); }
+  .keys b { display: block; color: var(--cyan); font-size: 10px; letter-spacing: .2em; text-transform: uppercase; margin-top: 2px; }
+
+  /* danger well */
+  .well { --rim: var(--cyan); position: relative; width: 100%; height: 130px; margin-top: 22px; border-radius: 14px; display: flex; align-items: flex-end; gap: 4px; padding: 6px; overflow: hidden; background: rgba(8, 6, 32, .8); box-shadow: 0 0 0 2px var(--rim), 0 0 30px -2px var(--rim); animation: rim 5s ease-in-out infinite; }
+  .well i { flex: 1; border-radius: 5px; background: var(--pT); height: 20%; animation: rise 5s ease-in-out infinite; }
+  .well i:nth-child(2) { background: var(--pO); animation-delay: .1s; } .well i:nth-child(3) { background: var(--pI); animation-delay: .2s; } .well i:nth-child(4) { background: var(--pS); animation-delay: .3s; } .well i:nth-child(5) { background: var(--pL); animation-delay: .4s; }
+  @keyframes rise { 0%, 8% { height: 14%; } 70%, 85% { height: 88%; } 100% { height: 14%; } }
+  @keyframes rim { 0%, 15% { --rim: #5ee7ff; box-shadow: 0 0 0 2px #5ee7ff, 0 0 26px -2px #5ee7ff; } 70%, 85% { box-shadow: 0 0 0 2px #ff4058, 0 0 40px 2px #ff4058; } 100% { box-shadow: 0 0 0 2px #5ee7ff, 0 0 26px -2px #5ee7ff; } }
+
+  /* best */
+  .score { font-family: var(--display); font-size: clamp(34px, 4.2vw, 54px); margin-top: 26px; background: linear-gradient(90deg, var(--cyan), var(--pink)); -webkit-background-clip: text; background-clip: text; color: transparent; letter-spacing: .04em; }
+
+  /* dense mini-board */
+  .mini { display: grid; grid-template-columns: repeat(14, 1fr); gap: 4px; margin-top: 26px; }
+  .mini b { aspect-ratio: 1; border-radius: 22%; background: hsl(var(--h) 70% 65%); opacity: 0; animation: pop 5s calc(var(--i) * 28ms) infinite; box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .2); }
+  @keyframes pop { 0%, 5% { opacity: 0; transform: scale(.3); } 12%, 82% { opacity: .9; transform: none; } 92%, 100% { opacity: 0; transform: scale(.3); } }
+
+  @media (max-width: 900px) { .combo, .gest, .danger, .best, .dense { grid-column: span 6; grid-row: auto; } }
+</style>
+
+<script>
+  // count the best score up when it scrolls into view
+  const el = document.getElementById('best')!;
+  const to = Number(el.dataset.to);
+  new IntersectionObserver(([e], io) => {
+    if (!e.isIntersecting) return;
+    io.disconnect();
+    const t0 = performance.now();
+    const f = (now: number) => {
+      const p = Math.min(1, (now - t0) / 1800);
+      el.textContent = String(Math.round(to * (1 - (1 - p) ** 3))).padStart(6, '0');
+      if (p < 1) requestAnimationFrame(f);
+    };
+    requestAnimationFrame(f);
+  }, { threshold: 0.6 }).observe(el);
+</script>

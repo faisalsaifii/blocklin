@@ -1,0 +1,64 @@
+---
+import Piece from './Piece.astro';
+import { COLORS, type PieceKey } from '../data/pieces';
+const items: { k: PieceKey; name: string; note: string }[] = [
+  { k: 'I', name: 'The Slammer', note: 'Four in a row. Your ticket to a Blocklin.' },
+  { k: 'O', name: 'The Cube', note: 'No rotation drama. Pure, honest geometry.' },
+  { k: 'T', name: 'The Fixer', note: 'Fills any crater, ruins any plan to ignore it.' },
+  { k: 'S', name: 'The Slither', note: 'Leans right. Loves a staircase.' },
+  { k: 'Z', name: 'The Zig', note: 'Leans left. Hates being left alone.' },
+  { k: 'J', name: 'The Hook', note: 'Tucks into corners like it pays rent.' },
+  { k: 'L', name: 'The Boot', note: 'Kicks gaps shut. Mind your overhangs.' },
+];
+---
+<section class="pieces wrap" id="pieces">
+  <p class="eyebrow reveal">Seven shapes</p>
+  <h2 class="h2 reveal" style="--d:.05s">Meet the <em>cast.</em></h2>
+  <p class="lede reveal" style="--d:.1s">Every piece has a colour, a personality and a rotation you'll learn by thumb. Hover one. Tap it. It spins.</p>
+
+  <div class="row">
+    {items.map((it, i) => (
+      <button class="tile reveal" style={`--c:${COLORS[it.k]};--d:${0.05 * i}s;--i:${i}`} data-rot="0" aria-label={`${it.name} piece, tap to rotate`}>
+        <span class="glyph">{it.k}</span>
+        <span class="stage"><span class="spin"><Piece type={it.k} size={30} /></span></span>
+        <strong>{it.name}</strong>
+        <small>{it.note}</small>
+      </button>
+    ))}
+  </div>
+</section>
+
+<style>
+  .pieces { padding: 120px 0 40px; position: relative; z-index: 2; }
+  .row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 14px; margin-top: 56px; }
+  .tile {
+    --c: #fff; position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 28px 14px 24px; border: 0; color: inherit; font: inherit; cursor: pointer;
+    border-radius: 26px; background: linear-gradient(180deg, color-mix(in srgb, var(--c) 18%, transparent), rgba(255, 255, 255, .03)); overflow: hidden;
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--c) 40%, transparent);
+    transition: transform .35s cubic-bezier(.3, 1.6, .5, 1), box-shadow .3s;
+  }
+  .tile:nth-child(odd) { margin-top: 26px; }
+  .tile::before { content: ''; position: absolute; inset: auto -30% -50% -30%; height: 80%; background: radial-gradient(closest-side, color-mix(in srgb, var(--c) 55%, transparent), transparent); opacity: 0; transition: opacity .4s; }
+  .tile:hover, .tile:focus-visible { transform: translateY(-12px) scale(1.04); box-shadow: inset 0 0 0 2px var(--c), 0 30px 60px -20px var(--c); outline: none; }
+  .tile:hover::before { opacity: 1; }
+  .glyph { position: absolute; top: -10px; right: 6px; font-family: var(--display); font-size: 84px; line-height: 1; color: color-mix(in srgb, var(--c) 18%, transparent); pointer-events: none; }
+  .stage { position: relative; display: grid; place-items: center; width: 100%; height: 112px; }
+  .spin { display: block; transition: transform .55s cubic-bezier(.3, 1.8, .4, 1); transform: rotate(calc(var(--rot, 0) * 90deg)); filter: drop-shadow(0 8px 14px color-mix(in srgb, var(--c) 55%, transparent)); }
+  .tile:hover .spin { animation: wiggle 1.6s ease-in-out infinite; }
+  @keyframes wiggle { 50% { translate: 0 -6px; } }
+  strong { position: relative; font-family: var(--display); font-size: 15px; font-weight: 400; letter-spacing: .02em; }
+  small { position: relative; font-size: 11px; line-height: 1.6; color: var(--dim); font-weight: 500; }
+
+  @media (max-width: 1000px) { .row { grid-template-columns: repeat(4, 1fr); } .tile:nth-child(odd) { margin-top: 0; } }
+  @media (max-width: 560px) { .row { grid-template-columns: repeat(2, 1fr); } }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLElement>('.tile').forEach((t) => {
+    const spin = t.querySelector<HTMLElement>('.spin')!;
+    let n = 0;
+    const go = () => { n++; spin.style.setProperty('--rot', String(n)); };
+    t.addEventListener('click', go);
+    t.addEventListener('pointerenter', (e) => { if ((e as PointerEvent).pointerType === 'mouse') go(); });
+  });
+</script>
