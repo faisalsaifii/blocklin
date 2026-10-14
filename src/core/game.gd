@@ -4,6 +4,8 @@ extends RefCounted
 
 signal lines_cleared(count: int)
 signal game_over
+signal piece_locked(cells: Array, type: String)  # absolute board cells of the piece
+signal rows_removed(rows: Array)  # [{y: original row index, row: Array of piece types}]
 
 const COLS := 10
 const ROWS := 20
@@ -108,18 +110,23 @@ func ghost_pos() -> Vector2i:
 	return p
 
 func _lock() -> void:
+	var placed := []
 	for c in cur_cells:
 		var p: Vector2i = c + cur_pos
 		if p.y >= 0:
 			grid[p.y][p.x] = cur_type
+			placed.append(p)
+	piece_locked.emit(placed, cur_type)
 	_clear_lines()
 	_spawn()
 
 func _clear_lines() -> void:
 	var cleared := 0
+	var removed := []
 	var y := ROWS - 1
 	while y >= 0:
 		if not grid[y].has(""):
+			removed.append({"y": y - cleared, "row": grid[y].duplicate()})
 			grid.remove_at(y)
 			var row := []
 			row.resize(COLS)
@@ -132,4 +139,5 @@ func _clear_lines() -> void:
 		score += LINE_SCORES[cleared] * level
 		lines += cleared
 		level = 1 + lines / 10
+		rows_removed.emit(removed)
 		lines_cleared.emit(cleared)
