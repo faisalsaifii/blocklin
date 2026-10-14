@@ -49,6 +49,7 @@ var row_flashes: Array = []  # {y, t}
 var lock_glows: Array = []  # {c: Vector2i, t, col}
 var drop_trails: Array = []  # {cells: Array, to: Vector2i, t, col}
 var popups: Array = []  # {text, y, t, col}
+var _clear_y := 0.0  # board row of the latest line clear (anchors the combo popup)
 var shake := 0.0
 var disp := Vector2.ZERO  # smoothed display position of the active piece
 var shown_score := 0.0
@@ -149,6 +150,8 @@ func _set_paused(on: bool) -> void:
 	if game != null and not game.over and on != paused:
 		Sfx.play("pause" if on else "resume")
 	paused = on
+	if on and game != null:
+		Settings.set_best(game.score)  # saved on pause so quitting from the pause card keeps the record
 	held.clear()
 	gesture.clear()
 	overlay.show_overlay(on, game.score if game != null else 0)
@@ -169,6 +172,7 @@ func _process(delta: float) -> void:
 		held.clear()
 		gesture.clear()
 		overlay.show_overlay(true, game.score, true)
+		Settings.set_best(game.score)
 		Sfx.play("gameover")
 	if not game.over and not paused:
 		timer += delta
@@ -250,6 +254,7 @@ func _on_rows_removed(rows: Array) -> void:
 			if t != "":
 				_burst(_cell_center(Vector2(x, r.y)), PieceDefs.COLORS[t], 3, 320.0, 0.8, cell * 0.2)
 	mid_y /= rows.size()
+	_clear_y = mid_y
 	if rows.size() >= 1 and rows.size() < CLEAR_NAMES.size():
 		var col := UI.ACCENT2 if rows.size() >= 4 else (UI.ACCENT if rows.size() >= 2 else Color.WHITE)
 		popups.append({"text": CLEAR_NAMES[rows.size()], "y": mid_y, "t": 1.0, "col": col})
@@ -258,6 +263,8 @@ func _on_rows_removed(rows: Array) -> void:
 func _on_lines_cleared(n: int) -> void:
 	flash = 1.0
 	Sfx.play_clear(n)
+	if game.combo >= 1:
+		popups.append({"text": "COMBO x%d" % (game.combo + 1), "y": maxf(1.0, _clear_y - 2.0), "t": 1.0, "col": UI.ACCENT2})
 
 func _animate(dt: float) -> void:
 	anim_t += dt
