@@ -7,8 +7,8 @@ signal game_over
 signal piece_locked(cells: Array, type: String)  # absolute board cells of the piece
 signal rows_removed(rows: Array)  # [{y: original row index, row: Array of piece types}]
 
-const COLS := 10
-const ROWS := 20
+const COLS := 14
+const ROWS := 28
 const LINE_SCORES := [0, 100, 300, 500, 800]
 
 var grid: Array = []  # grid[y][x] = "" or piece type
