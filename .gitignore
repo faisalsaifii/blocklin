@@ -1,0 +1,7 @@
+.godot/
+build/
+*.apk
+*.aab
+*.ipa
+export_presets.cfg
+.import/
