@@ -5,3 +5,4 @@ build/
 *.ipa
 export_presets.cfg
 .import/
+.vscode

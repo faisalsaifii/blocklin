@@ -9,6 +9,11 @@ const PLAY_BTN := Rect2(120, 520, 300, 90)
 var best := 0
 var t := 0.0
 var play_down := false
+var off := Vector2.ZERO  # where the 540x960 design area sits in the viewport
+
+func set_offset(o: Vector2) -> void:
+	off = o
+	queue_redraw()
 
 func set_active(on: bool) -> void:
 	visible = on
@@ -25,7 +30,7 @@ func _process(delta: float) -> void:
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
-		var inside := PLAY_BTN.grow(8).has_point(event.position)
+		var inside := PLAY_BTN.grow(8).has_point(event.position - off)
 		if event.pressed:
 			play_down = inside
 		else:
@@ -36,7 +41,8 @@ func _input(event: InputEvent) -> void:
 		play_pressed.emit()
 
 func _draw() -> void:
-	MenuBackdrop.draw(self, t)
+	MenuBackdrop.draw(self, t, get_viewport_rect().size, off)
+	draw_set_transform(off)
 	var fade := clampf((t - 0.7) / 0.6, 0.0, 1.0)
 	_draw_logo(clampf(t / 0.4, 0.0, 1.0))
 	_draw_title()
@@ -65,10 +71,10 @@ func _draw_logo(fade: float) -> void:
 	var half := (hi - lo + Vector2.ONE) * s * 0.5
 	for i in 8:
 		draw_circle(center, 80 - i * 8, Color(col, 0.014 * alpha))
-	draw_set_transform(center, sin(t * 1.3) * 0.06, Vector2(1.0, squash))
+	draw_set_transform(off + center, sin(t * 1.3) * 0.06, Vector2(1.0, squash))
 	for c in cells:
 		UI.block(self, Rect2(Vector2(c) * s - lo * s - half, Vector2(s, s)), col, alpha)
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	draw_set_transform(off)
 
 ## Per-letter drop-in intro, then a steady neon glow (pixel-snapped to avoid shimmer).
 func _draw_title() -> void:
