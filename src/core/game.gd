@@ -16,6 +16,7 @@ var cur_type := ""
 var cur_cells: Array = []  # current offsets
 var cur_pos := Vector2i.ZERO
 var next_type := ""
+var combo := -1  # consecutive locks that cleared lines; -1 = none
 var bag: Array = []
 var score := 0
 var lines := 0
@@ -135,8 +136,11 @@ func _clear_lines() -> void:
 			cleared += 1
 		else:
 			y -= 1
-	if cleared > 0:
-		score += LINE_SCORES[cleared] * level
+	if cleared == 0:
+		combo = -1
+	else:
+		combo += 1
+		score += LINE_SCORES[cleared] * level + 50 * combo * level
 		lines += cleared
 		level = 1 + lines / 10
 		rows_removed.emit(removed)
