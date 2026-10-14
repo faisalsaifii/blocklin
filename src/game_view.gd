@@ -58,6 +58,7 @@ var last_score := 0
 var last_level := 1
 var banner := 0.0
 var danger := 0.0
+var _slammed := false  # the lock in progress came from a hard drop (it has its own sound)
 
 func _ready() -> void:
 	add_child(overlay)
@@ -133,6 +134,7 @@ func start() -> void:
 	held.clear()
 	_set_paused(false)
 	_activate(true)
+	Sfx.play("play")
 	started.emit()
 
 func stop() -> void:
@@ -144,6 +146,8 @@ func _activate(on: bool) -> void:
 	set_process_input(on)
 
 func _set_paused(on: bool) -> void:
+	if game != null and not game.over and on != paused:
+		Sfx.play("pause" if on else "resume")
 	paused = on
 	held.clear()
 	gesture.clear()
@@ -165,6 +169,7 @@ func _process(delta: float) -> void:
 		held.clear()
 		gesture.clear()
 		overlay.show_overlay(true, game.score, true)
+		Sfx.play("gameover")
 	if not game.over and not paused:
 		timer += delta
 		if timer >= game.gravity_interval():
@@ -182,18 +187,32 @@ func _process(delta: float) -> void:
 
 func _press(name: String) -> void:
 	match name:
-		"left": game.move(-1)
-		"right": game.move(1)
-		"down": game.step()
-		"rotate": game.rotate()
+		"left": _move(-1)
+		"right": _move(1)
+		"down": _soft_drop()
+		"rotate": _rotate()
 		"drop": _hard_drop()
+
+func _move(dx: int) -> void:
+	if game.move(dx):
+		Sfx.play("move")
+
+func _rotate() -> void:
+	if game.rotate():
+		Sfx.play("rotate")
+
+func _soft_drop() -> void:
+	if game.step():
+		Sfx.play("soft")
 
 func _hard_drop() -> void:
 	var cells: Array = game.cur_cells.duplicate()
 	var from := game.cur_pos
 	var to := game.ghost_pos()
 	var col: Color = PieceDefs.COLORS[game.cur_type]
+	_slammed = true
 	game.hard_drop()
+	_slammed = false
 	if to.y > from.y:
 		drop_trails.append({"cells": cells, "from": from, "to": to, "t": 1.0, "col": col})
 	shake = maxf(shake, 5.0)
@@ -213,6 +232,7 @@ func _burst(pos: Vector2, col: Color, n: int, speed: float, life: float, size: f
 				"size": size * randf_range(0.6, 1.2), "col": col.lerp(Color.WHITE, randf() * 0.5)})
 
 func _on_piece_locked(cells: Array, type: String) -> void:
+	Sfx.play("drop" if _slammed else "lock")
 	var col: Color = PieceDefs.COLORS[type]
 	for c in cells:
 		lock_glows.append({"c": c, "t": 1.0, "col": col})
@@ -235,8 +255,9 @@ func _on_rows_removed(rows: Array) -> void:
 		popups.append({"text": CLEAR_NAMES[rows.size()], "y": mid_y, "t": 1.0, "col": col})
 	shake = maxf(shake, 4.0 + rows.size() * 2.5)
 
-func _on_lines_cleared(_n: int) -> void:
+func _on_lines_cleared(n: int) -> void:
 	flash = 1.0
+	Sfx.play_clear(n)
 
 func _animate(dt: float) -> void:
 	anim_t += dt
@@ -251,6 +272,7 @@ func _animate(dt: float) -> void:
 		last_level = game.level
 		level_bump = 1.0
 		banner = 1.0
+		Sfx.play("level")
 		_burst(board_origin + board_size / 2.0, UI.ACCENT, 40, 420.0, 1.0, cell * 0.2)
 	shown_score = move_toward(shown_score, float(game.score), maxf(8.0, absf(game.score - shown_score) * 6.0) * dt)
 	# Smooth the active piece toward its logical cell; snap on respawn.
@@ -320,10 +342,10 @@ func _input(ev: InputEvent) -> void:
 			_set_paused(true)
 			return
 		match event.keycode:
-			KEY_LEFT: game.move(-1)
-			KEY_RIGHT: game.move(1)
-			KEY_DOWN: game.step()
-			KEY_UP: game.rotate()
+			KEY_LEFT: _move(-1)
+			KEY_RIGHT: _move(1)
+			KEY_DOWN: _soft_drop()
+			KEY_UP: _rotate()
 			KEY_SPACE: _hard_drop()
 
 ## Gesture controls: drag sideways to move, drag down to soft-drop,
@@ -331,15 +353,15 @@ func _input(ev: InputEvent) -> void:
 func _drag_gesture(pos: Vector2) -> void:
 	var a: Vector2 = gesture.anchor
 	while pos.x - a.x >= cell:
-		game.move(1)
+		_move(1)
 		a.x += cell
 		gesture.moved = true
 	while a.x - pos.x >= cell:
-		game.move(-1)
+		_move(-1)
 		a.x -= cell
 		gesture.moved = true
 	while pos.y - a.y >= cell:
-		game.step()
+		_soft_drop()
 		a.y += cell
 		gesture.moved = true
 	if pos.y < a.y:
@@ -354,7 +376,7 @@ func _end_gesture(pos: Vector2) -> void:
 	if d.y > 100.0 and d.y > absf(d.x) * 1.5 and ms < 250:
 		_hard_drop()
 	elif not gesture.moved and ms < 350:
-		game.rotate()
+		_rotate()
 	gesture.clear()
 
 ## Handles input while the pause or game-over card is showing.
@@ -367,6 +389,7 @@ func _input_paused(event: InputEvent) -> void:
 				overlay.set_settings_open(false)
 			elif event.keycode in [KEY_LEFT, KEY_RIGHT]:
 				Settings.set_controls(Settings.Controls.GESTURES if Settings.controls == Settings.Controls.BUTTONS else Settings.Controls.BUTTONS)
+				Sfx.play("select")
 				overlay.set_settings_open(true)
 		return
 	if event is InputEventScreenTouch and event.pressed:
@@ -376,12 +399,14 @@ func _input_paused(event: InputEvent) -> void:
 				or (not game.over and pause_btn.grow(6).has_point(event.position)):
 			_resume_or_restart()
 		elif PauseOverlay.QUIT_BTN.grow(6).has_point(event.position):
+			Sfx.play("back")
 			menu_requested.emit()
 	elif event is InputEventKey and event.pressed:
 		if event.keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE] \
 				or (not game.over and event.keycode in [KEY_ESCAPE, KEY_P]):
 			_resume_or_restart()
 		elif game.over and event.keycode == KEY_ESCAPE:
+			Sfx.play("back")
 			menu_requested.emit()
 
 func _resume_or_restart() -> void:

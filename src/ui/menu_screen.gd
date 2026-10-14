@@ -63,21 +63,32 @@ func _input(event: InputEvent) -> void:
 	elif event is InputEventKey and event.pressed:
 		if in_settings:
 			if event.keycode in [KEY_ESCAPE, KEY_ENTER, KEY_KP_ENTER]:
+				Sfx.play("back")
 				in_settings = false
 			elif event.keycode in [KEY_LEFT, KEY_RIGHT]:
 				Settings.set_controls(Settings.Controls.GESTURES if Settings.controls == Settings.Controls.BUTTONS else Settings.Controls.BUTTONS)
+				Sfx.play("select")
 		elif event.keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]:
 			play_pressed.emit()
 		elif event.keycode == KEY_S:
+			Sfx.play("click")
 			in_settings = true
 
 func _activate(name: String) -> void:
 	match name:
 		"play": play_pressed.emit()
-		"settings": in_settings = true
-		"back": in_settings = false
-		"buttons": Settings.set_controls(Settings.Controls.BUTTONS)
-		"gestures": Settings.set_controls(Settings.Controls.GESTURES)
+		"settings":
+			Sfx.play("click")
+			in_settings = true
+		"back":
+			Sfx.play("back")
+			in_settings = false
+		"buttons":
+			Settings.set_controls(Settings.Controls.BUTTONS)
+			Sfx.play("select")
+		"gestures":
+			Settings.set_controls(Settings.Controls.GESTURES)
+			Sfx.play("select")
 
 func _draw() -> void:
 	MenuBackdrop.draw(self, t, get_viewport_rect().size, off)

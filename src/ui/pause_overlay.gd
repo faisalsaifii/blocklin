@@ -61,6 +61,8 @@ func show_overlay(on: bool, current_score: int, is_game_over := false) -> void:
 		_card.queue_redraw()
 
 func set_settings_open(on: bool) -> void:
+	if on != in_settings:
+		Sfx.play("click" if on else "back")
 	in_settings = on
 	_card.queue_redraw()
 
@@ -68,9 +70,12 @@ func set_settings_open(on: bool) -> void:
 func settings_tap(pos: Vector2) -> void:
 	if OPT_BUTTONS.grow(6).has_point(pos):
 		Settings.set_controls(Settings.Controls.BUTTONS)
+		Sfx.play("select")
 	elif OPT_GESTURES.grow(6).has_point(pos):
 		Settings.set_controls(Settings.Controls.GESTURES)
+		Sfx.play("select")
 	elif BACK_BTN.grow(6).has_point(pos):
+		Sfx.play("back")
 		in_settings = false
 	_card.queue_redraw()
 
