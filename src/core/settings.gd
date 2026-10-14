@@ -6,12 +6,12 @@ const PATH := "user://settings.cfg"
 
 enum Controls { BUTTONS, GESTURES }
 
-static var controls := Controls.BUTTONS
+static var controls := Controls.GESTURES
 
 static func load_settings() -> void:
 	var cfg := ConfigFile.new()
 	if cfg.load(PATH) == OK:
-		controls = int(cfg.get_value("input", "controls", Controls.BUTTONS)) as Controls
+		controls = int(cfg.get_value("input", "controls", Controls.GESTURES)) as Controls
 
 static func set_controls(c: Controls) -> void:
 	controls = c
