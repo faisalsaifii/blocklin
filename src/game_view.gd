@@ -29,6 +29,7 @@ var paused := false
 var timer := 0.0
 var flash := 0.0
 var held := {}  # touch index -> {"name": String, "t": float}
+var gesture := {}  # active gesture touch: index, anchor, start, t, moved
 var overlay := PauseOverlay.new()
 
 func _ready() -> void:
@@ -63,6 +64,7 @@ func _activate(on: bool) -> void:
 func _set_paused(on: bool) -> void:
 	paused = on
 	held.clear()
+	gesture.clear()
 	overlay.show_overlay(on, game.score if game != null else 0)
 
 func _notification(what: int) -> void:
@@ -77,6 +79,7 @@ func _process(delta: float) -> void:
 	score_changed.emit(game.score)
 	if game.over and not overlay.visible:
 		held.clear()
+		gesture.clear()
 		overlay.show_overlay(true, game.score, true)
 	if not game.over and not paused:
 		timer += delta
@@ -122,14 +125,23 @@ func _input(ev: InputEvent) -> void:
 			if PAUSE_BTN.grow(6).has_point(event.position):
 				_set_paused(true)
 				return
+			if Settings.controls == Settings.Controls.GESTURES:
+				if gesture.is_empty():
+					gesture = {"index": event.index, "anchor": event.position, "start": event.position,
+							"t": Time.get_ticks_msec(), "moved": false}
+				return
 			var b := _button_at(event.position)
 			if b != "":
 				held[event.index] = {"name": b, "t": 0.0}
 				_press(b)
 		else:
+			if not gesture.is_empty() and gesture.index == event.index:
+				_end_gesture(event.position)
 			held.erase(event.index)
 	elif event is InputEventScreenDrag:
-		if held.has(event.index) and _button_at(event.position) != held[event.index].name:
+		if not gesture.is_empty() and gesture.index == event.index:
+			_drag_gesture(event.position)
+		elif held.has(event.index) and _button_at(event.position) != held[event.index].name:
 			held.erase(event.index)
 	elif event is InputEventKey and event.pressed:
 		if event.keycode in [KEY_ESCAPE, KEY_P]:
@@ -142,10 +154,53 @@ func _input(ev: InputEvent) -> void:
 			KEY_UP: game.rotate()
 			KEY_SPACE: game.hard_drop()
 
+## Gesture controls: drag sideways to move, drag down to soft-drop,
+## tap to rotate, quick downward flick to hard-drop.
+func _drag_gesture(pos: Vector2) -> void:
+	var a: Vector2 = gesture.anchor
+	while pos.x - a.x >= CELL:
+		game.move(1)
+		a.x += CELL
+		gesture.moved = true
+	while a.x - pos.x >= CELL:
+		game.move(-1)
+		a.x -= CELL
+		gesture.moved = true
+	while pos.y - a.y >= CELL:
+		game.step()
+		a.y += CELL
+		gesture.moved = true
+	if pos.y < a.y:
+		a.y = pos.y  # don't build up a deficit when dragging back up
+	gesture.anchor = a
+	if (pos - gesture.start).length() > 16.0:
+		gesture.moved = true
+
+func _end_gesture(pos: Vector2) -> void:
+	var d: Vector2 = pos - gesture.start
+	var ms: int = Time.get_ticks_msec() - gesture.t
+	if d.y > 100.0 and d.y > absf(d.x) * 1.5 and ms < 250:
+		game.hard_drop()
+	elif not gesture.moved and ms < 350:
+		game.rotate()
+	gesture.clear()
+
 ## Handles input while the pause or game-over card is showing.
 func _input_paused(event: InputEvent) -> void:
+	if overlay.in_settings:
+		if event is InputEventScreenTouch and event.pressed:
+			overlay.settings_tap(event.position)
+		elif event is InputEventKey and event.pressed:
+			if event.keycode in [KEY_ESCAPE, KEY_ENTER, KEY_KP_ENTER]:
+				overlay.set_settings_open(false)
+			elif event.keycode in [KEY_LEFT, KEY_RIGHT]:
+				Settings.set_controls(Settings.Controls.GESTURES if Settings.controls == Settings.Controls.BUTTONS else Settings.Controls.BUTTONS)
+				overlay.set_settings_open(true)
+		return
 	if event is InputEventScreenTouch and event.pressed:
-		if PauseOverlay.RESUME_BTN.grow(6).has_point(event.position) \
+		if PauseOverlay.SETTINGS_BTN.grow(6).has_point(event.position):
+			overlay.set_settings_open(true)
+		elif PauseOverlay.RESUME_BTN.grow(6).has_point(event.position) \
 				or (not game.over and PAUSE_BTN.grow(6).has_point(event.position)):
 			_resume_or_restart()
 		elif PauseOverlay.QUIT_BTN.grow(6).has_point(event.position):
@@ -172,7 +227,10 @@ func _draw() -> void:
 	_draw_header()
 	_draw_board()
 	_draw_side_panels()
-	_draw_buttons()
+	if Settings.controls == Settings.Controls.BUTTONS:
+		_draw_buttons()
+	else:
+		UI.spaced_text(self, "DRAG TO MOVE  ·  TAP TO ROTATE  ·  FLICK DOWN TO DROP", 270, 900, 9, Color(1, 1, 1, 0.4), 2.0)
 
 func _draw_header() -> void:
 	var w1 := UI.title_font.get_string_size("BLOCK", HORIZONTAL_ALIGNMENT_LEFT, -1, 38).x

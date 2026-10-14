@@ -12,6 +12,7 @@ var fader := ColorRect.new()  # last child, so it draws above both screens
 
 func _ready() -> void:
 	UI.load_fonts()
+	Settings.load_settings()
 	add_child(menu)
 	add_child(game_view)
 	fader.color = Color(0.04, 0.03, 0.12, 0.0)
