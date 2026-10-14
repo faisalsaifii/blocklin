@@ -5,10 +5,19 @@ extends Node2D
 signal play_pressed
 
 const PLAY_BTN := Rect2(120, 520, 300, 90)
+const SETTINGS_BTN := Rect2(170, 646, 200, 52)
+const SETTINGS_RECTS := {
+	"buttons": Rect2(60, 330, 200, 190),
+	"gestures": Rect2(280, 330, 200, 190),
+	"back": Rect2(170, 700, 200, 52),
+}
 
 var best := 0
 var t := 0.0
-var play_down := false
+var play_down := false:
+	get: return down_btn == "play"
+var down_btn := ""
+var in_settings := false
 var off := Vector2.ZERO  # where the 540x960 design area sits in the viewport
 
 func set_offset(o: Vector2) -> void:
@@ -21,34 +30,68 @@ func set_active(on: bool) -> void:
 	set_process_input(on)
 	if on:
 		t = 0.0
-		play_down = false
+		down_btn = ""
+		in_settings = false
 		queue_redraw()
 
 func _process(delta: float) -> void:
 	t += delta
 	queue_redraw()
 
+func _hit(event: InputEventScreenTouch) -> String:
+	var p: Vector2 = event.position - off
+	if in_settings:
+		for name in SETTINGS_RECTS:
+			if (SETTINGS_RECTS[name] as Rect2).grow(8).has_point(p):
+				return name
+		return ""
+	if PLAY_BTN.grow(8).has_point(p):
+		return "play"
+	if SETTINGS_BTN.grow(8).has_point(p):
+		return "settings"
+	return ""
+
 func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
-		var inside := PLAY_BTN.grow(8).has_point(event.position - off)
+		var hit := _hit(event)
 		if event.pressed:
-			play_down = inside
+			down_btn = hit
 		else:
-			if play_down and inside:
-				play_pressed.emit()
-			play_down = false
-	elif event is InputEventKey and event.pressed and event.keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]:
-		play_pressed.emit()
+			if down_btn != "" and down_btn == hit:
+				_activate(hit)
+			down_btn = ""
+	elif event is InputEventKey and event.pressed:
+		if in_settings:
+			if event.keycode in [KEY_ESCAPE, KEY_ENTER, KEY_KP_ENTER]:
+				in_settings = false
+			elif event.keycode in [KEY_LEFT, KEY_RIGHT]:
+				Settings.set_controls(Settings.Controls.GESTURES if Settings.controls == Settings.Controls.BUTTONS else Settings.Controls.BUTTONS)
+		elif event.keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]:
+			play_pressed.emit()
+		elif event.keycode == KEY_S:
+			in_settings = true
+
+func _activate(name: String) -> void:
+	match name:
+		"play": play_pressed.emit()
+		"settings": in_settings = true
+		"back": in_settings = false
+		"buttons": Settings.set_controls(Settings.Controls.BUTTONS)
+		"gestures": Settings.set_controls(Settings.Controls.GESTURES)
 
 func _draw() -> void:
 	MenuBackdrop.draw(self, t, get_viewport_rect().size, off)
 	draw_set_transform(off)
 	var fade := clampf((t - 0.7) / 0.6, 0.0, 1.0)
+	if in_settings:
+		_draw_settings()
+		return
 	_draw_logo(clampf(t / 0.4, 0.0, 1.0))
 	_draw_title()
 	_draw_tagline(fade)
 	_draw_best(fade)
 	_draw_play_button(fade)
+	_draw_pill(SETTINGS_BTN, "SETTINGS", down_btn == "settings", fade)
 	UI.spaced_text(self, "© BLOCKLIN", 270, 934, 10, Color(1, 1, 1, 0.3 * fade), 3.0)
 
 ## Showcase piece that cycles through every tetromino, popping in each time.
@@ -111,6 +154,46 @@ func _draw_best(fade: float) -> void:
 	var gx := 270.0 - (lbl_w + 14.0 + val_w) / 2.0
 	UI.spaced_text(self, "BEST", gx + lbl_w / 2.0, 447, 11, Color(1, 1, 1, 0.55 * fade), 2.0)
 	UI.text(self, val, Vector2(gx + lbl_w + 14.0, 448), 20, Color(UI.ACCENT, fade))
+
+func _draw_pill(rect: Rect2, label: String, pressed: bool, fade: float) -> void:
+	var r := rect
+	if pressed:
+		r.position.y += 3
+	var base := UI.ACCENT.darkened(0.45)
+	draw_style_box(UI.box(Color(base.darkened(0.4), fade), 26), Rect2(rect.position + Vector2(0, 5), rect.size))
+	draw_style_box(UI.box(Color(base, fade), 26, 2, Color(1, 1, 1, 0.5 * fade)), r)
+	draw_style_box(UI.box(Color(1, 1, 1, 0.18 * fade), 10), Rect2(r.position + Vector2(14, 6), Vector2(r.size.x - 28, 14)))
+	UI.spaced_text(self, label, r.get_center().x, r.get_center().y + 6, 16, Color(1, 1, 1, fade), 3.0)
+
+func _draw_settings() -> void:
+	UI.glow_text(self, "SETTINGS", Vector2(270 - UI.title_font.get_string_size("SETTINGS", HORIZONTAL_ALIGNMENT_LEFT, -1, 44).x / 2, 190), 44, UI.ACCENT.lerp(Color.WHITE, 0.6), UI.title_font, 1.0)
+	UI.spaced_text(self, "CONTROLS", 270, 300, 13, UI.TEXT_DIM, 4.0)
+	var gestures := Settings.controls == Settings.Controls.GESTURES
+	_draw_option(SETTINGS_RECTS["buttons"], "BUTTONS", "On-screen buttons", not gestures, "buttons")
+	_draw_option(SETTINGS_RECTS["gestures"], "GESTURES", "Swipe & tap", gestures, "gestures")
+	UI.spaced_text(self, "GESTURES: DRAG TO MOVE · TAP TO ROTATE", 270, 570, 9, Color(1, 1, 1, 0.45), 2.0)
+	UI.spaced_text(self, "SWIPE DOWN TO DROP · FLICK TO SLAM", 270, 590, 9, Color(1, 1, 1, 0.45), 2.0)
+	_draw_pill(SETTINGS_RECTS["back"], "BACK", down_btn == "back", 1.0)
+
+func _draw_option(rect: Rect2, title: String, sub: String, selected: bool, id: String) -> void:
+	var r := rect
+	if down_btn == id:
+		r.position.y += 3
+	var col := UI.ACCENT2 if selected else Color.WHITE
+	draw_style_box(UI.box(Color(col, 0.18 if selected else 0.06), 22, 3 if selected else 1, Color(col, 0.9 if selected else 0.25)), r)
+	var c := r.get_center()
+	# Icon
+	if id == "buttons":
+		for i in 3:
+			draw_style_box(UI.box(Color(col, 0.7), 8), Rect2(c.x - 48 + i * 34, c.y - 52, 28, 28))
+	else:
+		draw_arc(c + Vector2(0, -38), 14, 0, TAU, 24, Color(col, 0.8), 3.0, true)
+		draw_line(c + Vector2(-34, -38), c + Vector2(-20, -38), Color(col, 0.7), 3.0)
+		draw_line(c + Vector2(20, -38), c + Vector2(34, -38), Color(col, 0.7), 3.0)
+	UI.spaced_text(self, title, c.x, c.y + 14, 15, Color(col, 1.0), 2.0)
+	UI.spaced_text(self, sub, c.x, c.y + 40, 9, Color(1, 1, 1, 0.55), 1.5)
+	if selected:
+		UI.spaced_text(self, "SELECTED", c.x, c.y + 70, 9, Color(UI.ACCENT, 1.0), 2.0)
 
 ## Breathing glow + press feedback.
 func _draw_play_button(fade: float) -> void:
