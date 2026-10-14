@@ -1,0 +1,249 @@
+<div class="phone" id="phone">
+  <div class="body">
+    <i class="btn-side b1"></i><i class="btn-side b2"></i><i class="btn-side b3"></i>
+    <div class="screen">
+      <canvas id="demo" width="540" height="960" aria-label="Blocklin gameplay, played by a bot"></canvas>
+      <div class="notch"></div>
+      <div class="glare"></div>
+    </div>
+  </div>
+  <div class="shadow"></div>
+</div>
+
+<style>
+  .phone { --rx: 0deg; --ry: 0deg; position: relative; width: min(300px, 74vw); aspect-ratio: 300 / 518; perspective: 1400px; }
+  .body {
+    position: absolute; inset: 0; border-radius: 46px; padding: 10px;
+    background: linear-gradient(145deg, #55508a, #1b1740 35%, #0b0820 70%, #3a3570);
+    box-shadow: 0 0 0 2px #0a0720, inset 0 0 0 2px rgba(255, 255, 255, .16), 0 40px 90px -20px rgba(255, 107, 203, .45), 0 0 120px -10px rgba(94, 231, 255, .35);
+    transform: rotateX(var(--rx)) rotateY(var(--ry)) rotateZ(-3deg);
+    transition: transform .25s ease-out; transform-style: preserve-3d;
+    animation: bob 6s ease-in-out infinite;
+  }
+  @keyframes bob { 50% { translate: 0 -14px; } }
+  .screen { position: relative; width: 100%; height: 100%; border-radius: 36px; overflow: hidden; background: #0f0c29; }
+  canvas { width: 100%; height: 100%; display: block; }
+  .notch { position: absolute; top: 9px; left: 50%; width: 84px; height: 22px; margin-left: -42px; border-radius: 99px; background: #05030f; }
+  .glare { position: absolute; inset: 0; background: linear-gradient(115deg, rgba(255, 255, 255, .16) 0%, transparent 28%, transparent 70%, rgba(94, 231, 255, .08) 100%); pointer-events: none; }
+  .btn-side { position: absolute; right: -4px; width: 4px; border-radius: 0 3px 3px 0; background: #2a2560; }
+  .b1 { top: 22%; height: 48px; } .b2 { top: 32%; height: 48px; right: auto; left: -4px; border-radius: 3px 0 0 3px; } .b3 { top: 38%; height: 70px; right: auto; left: -4px; border-radius: 3px 0 0 3px; }
+  .shadow { position: absolute; left: 10%; right: 10%; bottom: -46px; height: 30px; border-radius: 50%; background: radial-gradient(closest-side, rgba(255, 107, 203, .55), transparent); filter: blur(8px); animation: sh 6s ease-in-out infinite; }
+  @keyframes sh { 50% { transform: scale(.82); opacity: .6; } }
+</style>
+
+<script>
+  import { SHAPES, COLORS, KEYS, type PieceKey } from '../data/pieces';
+
+  const W = 14, H = 28, CELL = 15;
+  const DW = 270, DH = 480;                 // design space (half of the game's 540x960)
+  const BX = (DW - W * CELL) / 2, BY = 50;  // board origin
+  const cv = document.getElementById('demo') as HTMLCanvasElement;
+  const ctx = cv.getContext('2d')!;
+  const k =cv.width / DW;
+
+  type Cell = string | null;
+  type Pt = [number, number];
+  let grid: Cell[][] = [];
+  let bag: PieceKey[] = [];
+  let cur = { t: 'T' as PieceKey, rot: 0, x: 6, y: 0 };
+  let next: PieceKey = 'I';
+  let target = { rot: 0, x: 6 };
+  let score = 0, lines = 0, level = 1, combo = -1;
+  let acc = 0, slam = false;
+  let flashRows: number[] = [], flashT = 0;
+  let over = 0;
+  let popups: { text: string; y: number; t: number; col: string }[] = [];
+  let sparks: { x: number; y: number; vx: number; vy: number; t: number; col: string; s: number }[] = [];
+  let stars: { x: number; y: number; p: number }[] = [];
+
+  const draw7 = (): PieceKey => { if (!bag.length) bag = [...KEYS].sort(() => Math.random() - 0.5); return bag.pop()!; };
+  const cells = (t: PieceKey, rot: number): Pt[] => {
+    let c = SHAPES[t].map((p) => [...p] as Pt);
+    for (let r = 0; r < (rot & 3); r++) c = c.map(([x, y]) => [-y, x] as Pt);
+    return c;
+  };
+  const fits = (t: PieceKey, rot: number, x: number, y: number, g = grid) =>
+    cells(t, rot).every(([cx, cy]) => { const gx = x + cx, gy = y + cy; return gx >= 0 && gx < W && gy < H && (gy < 0 || !g[gy][gx]); });
+
+  const reset = () => {
+    grid = Array.from({ length: H }, () => Array<Cell>(W).fill(null));
+    for (let r = 0; r < 5; r++) {
+      const y = H - 1 - r, holes = new Set([(Math.random() * W) | 0, (Math.random() * W) | 0]);
+      for (let x = 0; x < W; x++) if (!holes.has(x)) grid[y][x] = COLORS[KEYS[(Math.random() * 7) | 0]];
+    }
+    score = 0; lines = 0; level = 1; combo = -1; popups = []; sparks = []; flashRows = [];
+    spawn();
+  };
+
+  const evaluate = (g: Cell[][]) => {
+    const hts = Array(W).fill(0); let holes = 0, cleared = 0;
+    for (let y = 0; y < H; y++) if (g[y].every(Boolean)) cleared++;
+    for (let x = 0; x < W; x++) {
+      let seen = false;
+      for (let y = 0; y < H; y++) { if (g[y][x]) { if (!seen) { hts[x] = H - y; seen = true; } } else if (seen) holes++; }
+    }
+    let agg = 0, bump = 0;
+    for (let x = 0; x < W; x++) { agg += hts[x]; if (x) bump += Math.abs(hts[x] - hts[x - 1]); }
+    return -0.51 * agg + 0.9 * cleared * cleared - 0.75 * holes - 0.18 * bump;
+  };
+
+  const plan = () => {
+    let best = -Infinity;
+    const rots = cur.t === 'O' ? 1 : cur.t === 'I' || cur.t === 'S' || cur.t === 'Z' ? 2 : 4;
+    for (let rot = 0; rot < rots; rot++) for (let x = -2; x < W + 2; x++) {
+      if (!fits(cur.t, rot, x, 0)) continue;
+      let y = 0; while (fits(cur.t, rot, x, y + 1)) y++;
+      const g = grid.map((r) => r.slice());
+      cells(cur.t, rot).forEach(([cx, cy]) => { if (y + cy >= 0) g[y + cy][x + cx] = 'x'; });
+      const s = evaluate(g) + Math.random() * 0.05;
+      if (s > best) { best = s; target = { rot, x }; }
+    }
+  };
+
+  const spawn = () => {
+    cur = { t: next, rot: 0, x: 6, y: 0 };
+    next = draw7();
+    slam = false; acc = 0;
+    if (!fits(cur.t, 0, cur.x, cur.y)) { over = 1.4; return; }
+    plan();
+  };
+
+  const lock = () => {
+    cells(cur.t, cur.rot).forEach(([cx, cy]) => { const y = cur.y + cy; if (y >= 0) grid[y][cur.x + cx] = COLORS[cur.t]; });
+    const full = grid.map((r, i) => (r.every(Boolean) ? i : -1)).filter((i) => i >= 0);
+    if (full.length) {
+      flashRows = full; flashT = 1; combo++;
+      const base = [0, 100, 300, 500, 800][full.length];
+      score += base * level + (combo > 0 ? 50 * combo * level : 0);
+      lines += full.length; level = 1 + Math.floor(lines / 10);
+      const mid = full[0];
+      popups.push({ text: ['', 'SINGLE', 'DOUBLE', 'TRIPLE', 'BLOCKLIN!'][full.length], y: mid, t: 1, col: full.length >= 4 ? '#ff6bcb' : full.length >= 2 ? '#5ee7ff' : '#fff' });
+      if (combo >= 1) popups.push({ text: `COMBO x${combo + 1}`, y: Math.max(1, mid - 2), t: 1, col: '#ff6bcb' });
+      for (const r of full) for (let x = 0; x < W; x++) for (let n = 0; n < 2; n++)
+        sparks.push({ x: BX + x * CELL + CELL / 2, y: BY + r * CELL + CELL / 2, vx: (Math.random() - 0.5) * 120, vy: -Math.random() * 130 - 20, t: 1, col: grid[r][x] || '#fff', s: 2 + Math.random() * 3 });
+    } else { combo = -1; score += 4 * level; }
+    spawn();
+  };
+
+  const clearRows = () => {
+    grid = grid.filter((_, i) => !flashRows.includes(i));
+    while (grid.length < H) grid.unshift(Array<Cell>(W).fill(null));
+    flashRows = [];
+  };
+
+  const stackH = () => { const y = grid.findIndex((r) => r.some(Boolean)); return y < 0 ? 0 : H - y; };
+
+  const step = () => {
+    if (cur.rot !== target.rot && fits(cur.t, cur.rot + 1, cur.x, cur.y)) { cur.rot++; return; }
+    if (cur.x !== target.x) { const nx = cur.x + Math.sign(target.x - cur.x); if (fits(cur.t, cur.rot, nx, cur.y)) { cur.x = nx; return; } }
+    if (cur.rot === target.rot && cur.x === target.x) slam = true;
+    if (fits(cur.t, cur.rot, cur.x, cur.y + 1)) cur.y++; else lock();
+  };
+
+  /* ---------- rendering ---------- */
+  const rr = (x: number, y: number, w: number, h: number, r: number) => { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); };
+  const block = (x: number, y: number, col: string, a = 1) => {
+    ctx.globalAlpha = a;
+    rr(x + 1, y + 1, CELL - 2, CELL - 2, 4); ctx.fillStyle = col; ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 1; ctx.stroke();
+    rr(x + 3, y + 2.5, CELL - 6, 3, 1.5); ctx.fillStyle = 'rgba(255,255,255,.32)'; ctx.fill();
+    ctx.globalAlpha = 1;
+  };
+  const label = (s: string, x: number, y: number, size: number, col = '#fff', align: CanvasTextAlign = 'left', font = 'Bungee') => {
+    ctx.font = `${size}px ${font}`; ctx.textAlign = align; ctx.fillStyle = col; ctx.fillText(s, x, y);
+  };
+
+  const render = (pulse: number) => {
+    ctx.setTransform(k, 0, 0, k, 0, 0);
+    const bg = ctx.createLinearGradient(0, 0, 0, DH); bg.addColorStop(0, '#0f0c29'); bg.addColorStop(1, '#302b63');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, DW, DH);
+    for (const s of stars) { ctx.fillStyle = `rgba(255,255,255,${0.12 + 0.35 * Math.abs(Math.sin(pulse * 0.8 + s.p))})`; ctx.fillRect(s.x, s.y, 1, 1); }
+
+    // HUD
+    ctx.textBaseline = 'alphabetic';
+    const panel = (x: number, w: number) => { rr(x, 12, w, 30, 8); ctx.fillStyle = 'rgba(255,255,255,.07)'; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,.1)'; ctx.lineWidth = 1; ctx.stroke(); };
+    panel(BX, 90); panel(BX + 96, 40);
+    label('SCORE', BX + 8, 23, 6, 'rgba(255,255,255,.55)', 'left', 'Orbitron');
+    label(String(score), BX + 8, 37, 13);
+    label('LVL', BX + 102, 23, 6, 'rgba(255,255,255,.55)', 'left', 'Orbitron');
+    label(String(level), BX + 102, 37, 13, '#5ee7ff');
+    panel(BX + 150, 60);
+    label('NEXT', BX + 156, 23, 6, 'rgba(255,255,255,.55)', 'left', 'Orbitron');
+    ctx.save(); ctx.translate(BX + 156, 26);
+    const nc = SHAPES[next]; const mnx = Math.min(...nc.map((c) => c[0])), mny = Math.min(...nc.map((c) => c[1]));
+    nc.forEach(([cx, cy]) => { rr((cx - mnx) * 5 + 2, (cy - mny) * 5 + 1, 4.4, 4.4, 1.4); ctx.fillStyle = COLORS[next]; ctx.fill(); });
+    ctx.restore();
+
+    // board rim (cyan → red with danger)
+    const danger = Math.min(1, Math.max(0, (stackH() - 12) / 12));
+    const rim = `rgb(${94 + (255 - 94) * danger},${231 + (64 - 231) * danger},${255 + (77 - 255) * danger})`;
+    ctx.save(); ctx.shadowColor = rim; ctx.shadowBlur = 14 + 6 * Math.sin(pulse * 2);
+    rr(BX - 3, BY - 3, W * CELL + 6, H * CELL + 6, 9); ctx.fillStyle = 'rgba(8,6,32,.85)'; ctx.fill();
+    ctx.strokeStyle = rim; ctx.globalAlpha = 0.55; ctx.lineWidth = 1.5; ctx.stroke(); ctx.restore();
+    ctx.strokeStyle = 'rgba(255,255,255,.04)'; ctx.lineWidth = 1; ctx.beginPath();
+    for (let x = 1; x < W; x++) { ctx.moveTo(BX + x * CELL, BY); ctx.lineTo(BX + x * CELL, BY + H * CELL); }
+    for (let y = 1; y < H; y++) { ctx.moveTo(BX, BY + y * CELL); ctx.lineTo(BX + W * CELL, BY + y * CELL); }
+    ctx.stroke();
+
+    // settled blocks
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (grid[y][x]) block(BX + x * CELL, BY + y * CELL, grid[y][x]!, flashRows.includes(y) ? 1 - flashT * 0.6 : 1);
+    for (const r of flashRows) { ctx.fillStyle = `rgba(255,255,255,${0.9 * flashT})`; ctx.fillRect(BX, BY + r * CELL, W * CELL, CELL); ctx.fillStyle = `rgba(94,231,255,${0.25 * flashT})`; ctx.fillRect(BX, BY + r * CELL - 5, W * CELL, CELL + 10); }
+
+    // ghost + piece
+    if (!flashRows.length && !over) {
+      let gy = cur.y; while (fits(cur.t, cur.rot, cur.x, gy + 1)) gy++;
+      cells(cur.t, cur.rot).forEach(([cx, cy]) => {
+        rr(BX + (cur.x + cx) * CELL + 2, BY + (gy + cy) * CELL + 2, CELL - 4, CELL - 4, 4);
+        ctx.fillStyle = COLORS[cur.t] + '22'; ctx.fill(); ctx.strokeStyle = COLORS[cur.t] + '88'; ctx.lineWidth = 1; ctx.stroke();
+      });
+      const frac = !slam && fits(cur.t, cur.rot, cur.x, cur.y + 1) ? Math.min(1, acc / TICK) : 0;
+      cells(cur.t, cur.rot).forEach(([cx, cy]) => { if (cur.y + cy >= -1) block(BX + (cur.x + cx) * CELL, BY + (cur.y + cy + frac) * CELL, COLORS[cur.t]); });
+    }
+
+    for (const s of sparks) { ctx.fillStyle = s.col; ctx.globalAlpha = s.t; ctx.fillRect(s.x - s.s / 2, s.y - s.s / 2, s.s, s.s); }
+    ctx.globalAlpha = 1;
+    for (const p of popups) {
+      const sc = 1 + 0.25 * Math.sin(Math.min(1, (1 - p.t) * 3) * Math.PI);
+      ctx.save(); ctx.translate(DW / 2, BY + p.y * CELL - (1 - p.t) * 24); ctx.scale(sc, sc);
+      ctx.globalAlpha = Math.min(1, p.t * 2.5); ctx.shadowColor = p.col; ctx.shadowBlur = 10;
+      label(p.text, 0, 0, 17, p.col, 'center'); ctx.restore();
+    }
+    if (over) { ctx.fillStyle = `rgba(15,12,41,${Math.min(0.75, over)})`; ctx.fillRect(BX, BY, W * CELL, H * CELL); label('GAME OVER', DW / 2, BY + H * CELL / 2, 20, '#fff', 'center'); }
+  };
+
+  /* ---------- loop ---------- */
+  const TICK = 62, SLAM_TICK = 17;
+  let visible = true, last = performance.now(), t0 = last;
+  const frame = (now: number) => {
+    requestAnimationFrame(frame);
+    const dt = Math.min(80, now - last); last = now;
+    if (!visible) return;
+    if (over > 0) { over -= dt / 1000; if (over <= 0) reset(); }
+    else if (flashRows.length) { flashT -= dt / 280; if (flashT <= 0) { clearRows(); flashT = 0; } }
+    else {
+      acc += dt;
+      const iv = slam ? SLAM_TICK : TICK;
+      while (acc >= iv) { acc -= iv; step(); if (flashRows.length || over) break; }
+    }
+    for (const s of sparks) { s.x += s.vx * dt / 1000; s.y += s.vy * dt / 1000; s.vy += 400 * dt / 1000; s.t -= dt / 700; }
+    sparks = sparks.filter((s) => s.t > 0);
+    for (const p of popups) p.t -= dt / 1100;
+    popups = popups.filter((p) => p.t > 0);
+    render((now - t0) / 1000);
+  };
+
+  const start = () => {
+    stars = Array.from({ length: 50 }, () => ({ x: Math.random() * DW, y: Math.random() * DH, p: Math.random() * 6 }));
+    next = draw7(); reset();
+    new IntersectionObserver((e) => (visible = e[0].isIntersecting)).observe(cv);
+    requestAnimationFrame(frame);
+  };
+  Promise.all([document.fonts.load('13px Bungee'), document.fonts.load('6px Orbitron')]).catch(() => {}).then(start);
+
+  /* ---------- 3d tilt ---------- */
+  const phone = document.getElementById('phone')!;
+  addEventListener('pointermove', (e) => {
+    phone.style.setProperty('--ry', `${(e.clientX / innerWidth - 0.5) * 22}deg`);
+    phone.style.setProperty('--rx', `${-(e.clientY / innerHeight - 0.5) * 16}deg`);
+  });
+</script>

@@ -1,0 +1,14 @@
+---
+import { COLORS, normalized, type PieceKey } from '../data/pieces';
+interface Props { type: PieceKey; size?: number; class?: string; style?: string }
+const { type, size = 28, class: cls = '', style = '' } = Astro.props;
+const { cells, w, h } = normalized(type);
+---
+<div class={`piece ${cls}`} style={`--s:${size}px;--c:${COLORS[type]};width:calc(var(--s)*${w});height:calc(var(--s)*${h});${style}`}>
+  {cells.map(([x, y]) => <i class="blk" style={`left:calc(var(--s)*${x});top:calc(var(--s)*${y})`}></i>)}
+</div>
+
+<style>
+  .piece { position: relative; display: block; }
+  .piece i { position: absolute; width: var(--s); height: var(--s); transform: scale(.94); }
+</style>
